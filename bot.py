@@ -8,9 +8,9 @@ import aiofiles
 import os
 
 # Your API credentials
-API_ID = 22420997
-API_HASH = "d7fbe2036e9ed2a1468fad5a5584a255"
-TOKEN = "7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE"
+API_ID = 
+API_HASH = ""
+TOKEN = ""
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
