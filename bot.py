@@ -4,7 +4,7 @@ import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-BOT_TOKEN = "YOUR_BOT_TOKEN"
+BOT_TOKEN = "7490926656:AAHG-oUUzGPony9xfyApSI0EbbymhneDU1k"
 
 # Function to start the bot
 async def start(update: Update, context):
