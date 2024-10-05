@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Start Gunicorn for the Flask app
-gunicorn app:app &
+# Start Gunicorn in the background
+gunicorn app:app --bind 0.0.0.0:8000 &
 
-# Start the Telegram bot
+# Wait for Gunicorn to start
+sleep 3
+
+# Start the bot
 python3 bot.py
