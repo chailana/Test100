@@ -1,85 +1,74 @@
+import os
 import logging
-import yt_dlp
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from pytube import YouTube
+import aiohttp
+from tqdm import tqdm
 
-# Configure logging
+# Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Replace these with your actual credentials
-API_ID = "22420997"
-API_HASH = "d7fbe2036e9ed2a1468fad5a5584a255"
-BOT_TOKEN = "7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE"
+# Your API ID, API hash, and bot token
+API_ID = '22420997'
+API_HASH = 'd7fbe2036e9ed2a1468fad5a5584a255'
+BOT_TOKEN = '7513058089:AAHAPtJbHEPbRMbV8rv-gAZ8KVL0ykAM2pE'
 
-# Function to handle errors
-def handle_error(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
-    context.bot.send_message(chat_id=update.effective_chat.id, text="An error occurred. Please try again.")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text("Welcome to the URL Uploader Bot! Send me a YouTube video URL to download.")
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome! Send me a YouTube or XVideos link.")
+async def download_video(url: str, quality: str):
+    yt = YouTube(url)
+    video_stream = yt.streams.get_by_itag(quality) if quality else yt.streams.get_highest_resolution()
+    
+    if not video_stream:
+        raise ValueError("No video stream found for the given quality.")
+    
+    # Download video
+    video_path = video_stream.download(output_path='downloads')
+    return video_path
 
-async def get_formats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = context.args[0] if context.args else None
-    if not url:
-        await update.message.reply_text("Please provide a valid URL.")
-        return
+async def progress_bar(current: int, total: int):
+    bar_length = 30  # Length of the progress bar
+    percent = (current / total) * 100
+    filled_length = int(bar_length * current // total)
+    bar = '█' * filled_length + '-' * (bar_length - filled_length)
+    print(f'\r|{bar}| {percent:.2f}% Complete', end='\r')
 
-    ydl_opts = {
-        'format': 'best',
-        'noplaylist': True,
-        'quiet': True,
-        'postprocessors': [{
-            'key': 'FFmpegVideoConvertor',
-            'preferedformat': 'mp4'
-        }],
-        'progress_hooks': [progress_hook]
-    }
-
+async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    url = update.message.text
+    await update.message.reply_text("Downloading video... Please wait.")
+    
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
+        quality = '22'  # Default quality (720p)
+        await update.message.reply_text("Available quality options: 18 (360p), 22 (720p), 137 (1080p). Reply with your choice or leave blank for default.")
+        
+        # Wait for user response with quality
+        quality_response = await context.bot.wait_for('message', chat_id=update.message.chat_id)
+        if quality_response.text.strip():
+            quality = quality_response.text.strip()
 
-            # Check for video formats
-            formats = info_dict.get('formats', [])
-            if not formats:
-                await update.message.reply_text("No formats found.")
-                return
-
-            # Create a message listing available formats
-            format_messages = []
-            for f in formats:
-                if 'vcodec' in f and f['vcodec'] != 'none':
-                    format_messages.append(f"Format: {f['format']} - Resolution: {f['height']}p - Codec: {f['vcodec']}")
-
-            if format_messages:
-                await update.message.reply_text("\n".join(format_messages))
-            else:
-                await update.message.reply_text("No valid video formats available.")
-
-    except KeyError as e:
-        logger.error(f"KeyError: {str(e)}")
-        await update.message.reply_text("An error occurred while processing the URL.")
-    except yt_dlp.utils.ExtractorError as e:
-        logger.error(f"ExtractorError: {str(e)}")
-        await update.message.reply_text(f"Failed to extract information from the video. Error: {str(e)}")
+        video_path = await download_video(url, quality)
+        await update.message.reply_text("Upload starting...")
+        
+        with open(video_path, 'rb') as video:
+            await context.bot.send_video(chat_id=update.message.chat_id, video=video, progress=progress_bar)
+        
+        os.remove(video_path)  # Clean up the downloaded file
+        await update.message.reply_text("Upload complete!")
+    
     except Exception as e:
-        logger.error(f"General Error: {str(e)}")
-        await update.message.reply_text("An unexpected error occurred. Please try again later.")
+        logging.error(f"Error: {e}")
+        await update.message.reply_text(f"An error occurred: {str(e)}")
 
-def progress_hook(d):
-    if d['status'] == 'downloading':
-        logger.info(f"Downloading: {d['filename']} - {d['_percent_str']}")
-
-def main():
+async def main() -> None:
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("get_formats", get_formats))
-    application.add_error_handler(handle_error)
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_video))
 
-    application.run_polling()
+    await application.run_polling()
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    import asyncio
+    asyncio.run(main())
