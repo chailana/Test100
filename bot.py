@@ -1,63 +1,79 @@
-import asyncio
-import logging
-from pytube import YouTube
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from tqdm import tqdm
-import aiofiles
 import os
+import requests
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+import threading
 
-# Your API credentials
-API_ID = 
-API_HASH = ""
-TOKEN = ""
+# Global variable to control the running state
+is_running = False
 
-# Configure logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text('Welcome! Use /batch <link1> <link2> ... to start uploading files.')
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome! Send me a YouTube URL to download.")
-
-async def download_youtube(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = update.message.text
-    await update.message.reply_text(f"Downloading video from {url}...")
-
+def download_file(url: str) -> str:
+    """Download file from the given URL and return the local file path."""
     try:
-        yt = YouTube(url)
-        video_stream = yt.streams.get_highest_resolution()
-
-        await update.message.reply_text(f"Downloading {video_stream.title}...")
-
-        # Create download folder if it doesn't exist
-        os.makedirs("downloads", exist_ok=True)
-
-        # Using tqdm for progress bar
-        with tqdm(total=100, bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} {postfix}', unit='%', unit_scale=True, dynamic_ncols=True) as pbar:
-            def progress_callback(stream, chunk: bytes, bytes_remaining: int):
-                # Calculate the percentage completed
-                percentage = (1 - bytes_remaining / stream.filesize) * 100
-                pbar.n = percentage
-                pbar.refresh()
-
-            video_stream.download(output_path="downloads", on_progress_callback=progress_callback)
-
-        video_file_path = f'downloads/{video_stream.default_filename}'
-        
-        async with aiofiles.open(video_file_path, 'rb') as video_file:
-            await update.message.reply_video(video_file, caption=yt.title)
-
-        await update.message.reply_text("Download complete!")
+        response = requests.get(url)
+        file_name = url.split('/')[-1]  # Extracting file name from URL
+        with open(file_name, 'wb') as f:
+            f.write(response.content)
+        return file_name
     except Exception as e:
-        logging.error(f"Error downloading video: {str(e)}")
-        await update.message.reply_text(f"Error: {str(e)}")
+        print(f"Error downloading {url}: {e}")
+        return None
 
-async def main():
-    application = ApplicationBuilder().token(TOKEN).build()
+def upload_file(update: Update, file_path: str) -> None:
+    """Upload the downloaded file to Telegram."""
+    try:
+        with open(file_path, 'rb') as f:
+            update.message.reply_document(f)
+        os.remove(file_path)  # Remove the file after uploading
+    except Exception as e:
+        update.message.reply_text(f"Error uploading {file_path}: {e}")
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_youtube))
+def process_links(links: list, update: Update) -> None:
+    """Process each link for download and upload."""
+    global is_running
+    for link in links:
+        if not is_running:
+            break
+        update.message.reply_text(f'Processing {link}...')
+        
+        # Download the file
+        file_path = download_file(link)
+        
+        if file_path:
+            # Upload the downloaded file
+            upload_file(update, file_path)
+    
+    if is_running:
+        update.message.reply_text('Batch upload completed.')
 
-    await application.run_polling()
+def batch(update: Update, context: CallbackContext) -> None:
+    """Start batch upload process."""
+    global is_running
+    is_running = True
+    update.message.reply_text('Starting batch upload...')
+    
+    # Start processing in a new thread to avoid blocking
+    threading.Thread(target=process_links, args=(context.args, update)).start()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+def stop(update: Update, context: CallbackContext) -> None:
+    """Stop the ongoing process."""
+    global is_running
+    is_running = False
+    update.message.reply_text('Stopping ongoing processes...')
+
+def main() -> None:
+    """Run the bot."""
+    updater = Updater("YOUR_BOT_TOKEN")
+
+    updater.dispatcher.add_handler(CommandHandler("start", start))
+    updater.dispatcher.add_handler(CommandHandler("batch", batch))
+    updater.dispatcher.add_handler(CommandHandler("stop", stop))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
