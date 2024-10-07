@@ -1,17 +1,16 @@
 import os
 import requests
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
-from asyncio import Queue
-import threading
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import asyncio
 
 # Global variable to control the running state
 is_running = False
 
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('Welcome! Use /batch <start>-<end> to start uploading files.')
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text('Welcome! Use /batch <start>-<end> to start uploading files.')
 
-def download_file(message_id: int) -> str:
+async def download_file(message_id: int) -> str:
     """Download file from the given message ID and return the local file path."""
     try:
         url = f"https://api.telegram.org/bot7490926656:AAHG-oUUzGPony9xfyApSI0EbbymhneDU1k/getFile?file_id={message_id}"
@@ -28,17 +27,17 @@ def download_file(message_id: int) -> str:
         print(f"Error downloading message {message_id}: {e}")
         return None
 
-def upload_file(update: Update, file_path: str) -> None:
+async def upload_file(update: Update, file_path: str) -> None:
     """Upload the downloaded file to Telegram."""
     try:
         with open(file_path, 'rb') as f:
-            update.message.reply_document(f)
+            await update.message.reply_document(f)
         os.remove(file_path)  # Remove the file after uploading
     
     except Exception as e:
-        update.message.reply_text(f"Error uploading {file_path}: {e}")
+        await update.message.reply_text(f"Error uploading {file_path}: {e}")
 
-def process_links(start: int, end: int, update: Update) -> None:
+async def process_links(start: int, end: int, update: Update) -> None:
     """Process each message ID for download and upload."""
     global is_running
     
@@ -46,19 +45,19 @@ def process_links(start: int, end: int, update: Update) -> None:
         if not is_running:
             break
         
-        update.message.reply_text(f'Processing message ID {message_id}...')
+        await update.message.reply_text(f'Processing message ID {message_id}...')
         
         # Download the file
-        file_path = download_file(message_id)
+        file_path = await download_file(message_id)
         
         if file_path:
             # Upload the downloaded file
-            upload_file(update, file_path)
+            await upload_file(update, file_path)
     
     if is_running:
-        update.message.reply_text('Batch upload completed.')
+        await update.message.reply_text('Batch upload completed.')
 
-def batch(update: Update, context: CallbackContext) -> None:
+async def batch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start batch upload process."""
     global is_running
     
@@ -71,34 +70,34 @@ def batch(update: Update, context: CallbackContext) -> None:
         start = int(start_end[0])
         end = int(start_end[1])
         
-        update.message.reply_text(f'Starting batch upload from {start} to {end}...')
+        await update.message.reply_text(f'Starting batch upload from {start} to {end}...')
         
-        # Start processing in a new thread to avoid blocking
-        threading.Thread(target=process_links, args=(start, end, update)).start()
+        is_running = True
+        
+        # Start processing links
+        await process_links(start, end, update)
     
     except (IndexError, ValueError):
-        update.message.reply_text('Please provide a valid range like /batch 347-3003.')
+        await update.message.reply_text('Please provide a valid range like /batch 347-3003.')
 
-def stop(update: Update, context: CallbackContext) -> None:
+async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Stop the ongoing process."""
     global is_running
     
     is_running = False
     
-    update.message.reply_text('Stopping ongoing processes...')
+    await update.message.reply_text('Stopping ongoing processes...')
 
 def main() -> None:
     """Run the bot."""
     
-    my_queue = Queue()  # Create an update queue
-    updater = Updater("7490926656:AAHG-oUUzGPony9xfyApSI0EbbymhneDU1k", update_queue=my_queue)
+    app = ApplicationBuilder().token("7490926656:AAHG-oUUzGPony9xfyApSI0EbbymhneDU1k").build()
     
-    updater.dispatcher.add_handler(CommandHandler("start", start))
-    updater.dispatcher.add_handler(CommandHandler("batch", batch))
-    updater.dispatcher.add_handler(CommandHandler("stop", stop))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("batch", batch))
+    app.add_handler(CommandHandler("stop", stop))
 
-    updater.start_polling()
-    updater.idle()
+    app.run_polling()
 
 if __name__ == '__main__':
     main()
