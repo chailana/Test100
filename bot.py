@@ -66,7 +66,7 @@ def stop(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     """Run the bot."""
-    updater = Updater("YOUR_BOT_TOKEN")
+    updater = Updater("7490926656:AAHG-oUUzGPony9xfyApSI0EbbymhneDU1k")
 
     updater.dispatcher.add_handler(CommandHandler("start", start))
     updater.dispatcher.add_handler(CommandHandler("batch", batch))
