@@ -1,10 +1,11 @@
-import http.server
-import socketserver
+from flask import Flask
 
-PORT = 8000
+app = Flask(__name__)  # Use __name__ instead of name
 
-Handler = http.server.SimpleHTTPRequestHandler
+@app.route('/')
+def hello():
+    return 'Hello, World!'  # Ensure no non-printable characters are present
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print(f"Serving HTTP on port {PORT}")
-    httpd.serve_forever()
+if __name__ == '__main__':  # Use __name__ instead of name
+    # Run the Flask app on port 8000
+    app.run(host='0.0.0.0', port=8080)
