@@ -8,7 +8,7 @@ import asyncio
 is_running = False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text('Welcome! Use /batch <start>-<end> to start uploading files.')
+    await update.message.reply_text('Welcome! Use /batch <link> to start downloading files.')
 
 async def download_file(message_id: int) -> str:
     """Download file from the given message ID and return the local file path."""
@@ -62,23 +62,27 @@ async def batch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     global is_running
     
     try:
-        start_end = context.args[0].split('-')
+        link = context.args[0]
         
-        if len(start_end) != 2:
-            raise ValueError("Invalid range format. Please use /batch <start>-<end>.")
+        # Extract start and end message IDs from the link
+        if '-' in link:
+            base_link, range_part = link.rsplit('/', 1)
+            start_end = range_part.split('-')
+            start = int(start_end[0])
+            end = int(start_end[1])
+            
+            await update.message.reply_text(f'Starting batch upload from {start} to {end}...')
+            
+            is_running = True
+            
+            # Start processing links
+            await process_links(start, end, update)
         
-        start = int(start_end[0])
-        end = int(start_end[1])
-        
-        await update.message.reply_text(f'Starting batch upload from {start} to {end}...')
-        
-        is_running = True
-        
-        # Start processing links
-        await process_links(start, end, update)
-    
+        else:
+            await update.message.reply_text('Please provide a valid range like /batch https://t.me/HentaiVerso/1107-2000.')
+
     except (IndexError, ValueError):
-        await update.message.reply_text('Please provide a valid range like /batch 347-3003.')
+        await update.message.reply_text('Please provide a valid link with a range like /batch https://t.me/HentaiVerso/1107-2000.')
 
 async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Stop the ongoing process."""
