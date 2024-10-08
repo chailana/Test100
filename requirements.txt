@@ -1,7 +1,4 @@
-pyrogram
-tgcrypto
-aiohttp
-python-dotenv
+asyncio
 gunicorn
 flask
 telethon
