@@ -1,12 +1,6 @@
-asyncio
-requests
-tqdm
-aiohttp
-pytube
-aiofiles
-TgCrypto
 pyrogram
-flask
+tgcrypto
+aiohttp
+python-dotenv
 gunicorn
-python-telegram-bot
-yt-dlp
+flask
