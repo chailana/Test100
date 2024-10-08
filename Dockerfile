@@ -15,7 +15,7 @@ COPY . .
 RUN chmod +x start.sh
 
 # Expose the port Flask will run on
-EXPOSE 8000
+EXPOSE 8080
 
 # Run the start.sh script to start the processes
 CMD ["./start.sh"]
