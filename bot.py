@@ -10,7 +10,7 @@ load_dotenv()
 
 API_ID = os.getenv("API_ID")  # Your API ID
 API_HASH = os.getenv("API_HASH")  # Your API HASH
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Your Bot Token
+BOT_TOKEN = os.getenv("7176424785:AAEusrLtmtGgRisJ6Pje6yAnN-ZbdZMoO1Q")  # Your Bot Token
 
 app = Client("url_uploader_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
 
