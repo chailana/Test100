@@ -1,16 +1,16 @@
 import os
 import re
 import subprocess
+import aiohttp
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-import aiohttp
 
 # Load environment variables from .env file
 load_dotenv()
 
 API_ID = os.getenv("API_ID")  # Your API ID
 API_HASH = os.getenv("API_HASH")  # Your API HASH
-BOT_TOKEN = os.getenv("7176424785:AAEusrLtmtGgRisJ6Pje6yAnN-ZbdZMoO1Q")  # Your Bot Token
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Your Bot Token
 
 app = Client("url_uploader_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
 
@@ -37,6 +37,10 @@ def generate_thumbnail(video_path):
     ]
     subprocess.run(command)
     return thumbnail_path
+
+@app.on_message(filters.command("start") & filters.private)
+async def start_command(client, message):
+    await message.reply("Hello! I am your URL uploader bot. Use the /upload command followed by the URL to upload files.")
 
 @app.on_message(filters.command("upload") & filters.private)
 async def upload_file(client, message):
