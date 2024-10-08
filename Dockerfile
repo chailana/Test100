@@ -24,4 +24,4 @@ COPY . .
 EXPOSE 8080
 
 # Command to run your bot using gunicorn
-CMD ["gunicorn", "app:app", "-b", "0.0.0.0:8080"]
+CMD python3 bot.py & gunicorn app:app
