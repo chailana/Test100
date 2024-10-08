@@ -1,23 +1,27 @@
-# Use an official Python runtime as a parent image
-FROM python:3.12-slim
+# Use the official Python image from the Docker Hub
+FROM python:3.12
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . .
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libffi-dev \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*  # Clean up
 
-# Install FFmpeg
-RUN apt-get update && \
-    apt-get install -y ffmpeg && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Copy the requirements file into the container
+COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
+# Install the required Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make port 8080 available to the world outside this container
+# Copy your bot code into the container
+COPY . .
+
+# Expose the port for the app
 EXPOSE 8080
 
-# Run the bot using gunicorn
-CMD ["gunicorn", "bot:app", "--bind", "0.0.0.0:8080"]
+# Command to run your bot using gunicorn
+CMD ["gunicorn", "app:app", "-b", "0.0.0.0:8080"]
