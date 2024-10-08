@@ -1,98 +1,55 @@
-import os
-import re
-import subprocess
-import aiohttp
-from dotenv import load_dotenv
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telethon import TelegramClient, events
+import asyncio
 
-# Load environment variables from .env file
-load_dotenv()
+# Replace with your API ID and API Hash
+API_ID = 'YOUR_API_ID'  
+API_HASH = 'YOUR_API_HASH'  
+BOT_TOKEN = 'YOUR_BOT_TOKEN'  # Replace with your Bot Token
 
-API_ID = os.getenv("API_ID")  # Your API ID
-API_HASH = os.getenv("API_HASH")  # Your API HASH
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Your Bot Token
+# Initialize the client with the bot token
+client = TelegramClient('bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-app = Client("url_uploader_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
+@client.on(events.NewMessage(pattern='/start'))
+async def start_handler(event):
+    await event.respond("Hello! I'm your forwarding bot. Use /batch to forward messages.")
 
-async def download_file(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            if response.status == 200:
-                filename = url.split("/")[-1]  # Get the file name from the URL
-                with open(filename, 'wb') as f:
-                    f.write(await response.read())
-                return filename
-            else:
-                return None
+@client.on(events.NewMessage)
+async def handler(event):
+    # Check if the message is from a private chat or a group/channel
+    if event.is_private or event.chat.type in ['group', 'supergroup']:
+        await event.forward_to('target_chat')  # Replace 'target_chat' with your target chat ID or username
 
-def generate_thumbnail(video_path):
-    thumbnail_path = "thumbnail.jpg"
-    # Generate a thumbnail using FFmpeg
-    command = [
-        'ffmpeg',
-        '-i', video_path,
-        '-ss', '00:00:01.000',  # Take a snapshot at 1 second
-        '-vframes', '1',
-        thumbnail_path
-    ]
-    subprocess.run(command)
-    return thumbnail_path
+async def forward_batch_messages(start_id, end_id, source_chat):
+    for message_id in range(start_id, end_id + 1):
+        try:
+            message = await client.get_messages(source_chat, ids=message_id)
+            await message.forward_to('target_chat')  # Forwarding to target chat
+            print(f"Forwarded message ID {message_id}")
+        except Exception as e:
+            print(f"Error forwarding message ID {message_id}: {e}")
 
-async def get_video_quality_options(video_url):
-    # This function simulates fetching video quality options.
-    # Replace this with actual logic to retrieve quality options from your video source.
-    return ["360p", "480p", "720p", "1080p"]
-
-@app.on_message(filters.command("start") & filters.private)
-async def start_command(client, message):
-    await message.reply("Hello! I am your URL uploader bot. Use the /upload command followed by the URL to upload files.")
-
-@app.on_message(filters.command("upload") & filters.private)
-async def upload_file(client, message):
-    if len(message.command) < 2:
-        await message.reply("Please provide a URL.")
+@client.on(events.NewMessage(pattern='/batch'))
+async def batch_handler(event):
+    # Example command: /batch 1-10 source_chat
+    command = event.raw_text.split()
+    if len(command) != 3:
+        await event.respond("Usage: /batch start-end source_chat")
         return
     
-    url = message.command[1]
-    await message.reply("Downloading your file...")
+    try:
+        start_end = command[1].split('-')
+        start_id = int(start_end[0])
+        end_id = int(start_end[1])
+        source_chat = command[2]
+        
+        await forward_batch_messages(start_id, end_id, source_chat)
+    except ValueError:
+        await event.respond("Invalid ID range. Please use integers.")
 
-    # Download the file to check if it's a video
-    filename = await download_file(url)
-    
-    if filename:
-        # Check if the file is a video and generate a thumbnail
-        if re.search(r'\.mp4|\.mkv|\.avi', filename):
-            thumbnail = generate_thumbnail(filename)
-            await message.reply_photo(photo=thumbnail, caption="Here's the thumbnail of your video.")
-            
-            # Fetch available quality options
-            qualities = await get_video_quality_options(url)
-            buttons = [[InlineKeyboardButton(q, callback_data=f"quality_{q}") for q in qualities]]
-            await message.reply("Select the video quality:", reply_markup=InlineKeyboardMarkup(buttons))
-        else:
-            await message.reply("The uploaded file is not a supported video format.")
-        os.remove(filename)  # Remove the downloaded file
-    else:
-        await message.reply("Failed to download the file.")
+async def main():
+    print('Bot is running...')
+    await client.run_until_disconnected()
 
-@app.on_callback_query(filters.regex(r"quality_"))
-async def handle_quality_selection(client, callback_query):
-    quality = callback_query.data.split("_")[1]  # Extract quality from callback data
-    await callback_query.answer(f"You selected {quality} quality.")
-    
-    # Logic to download the video in the selected quality
-    original_url = ...  # You will need to store the original URL in context or handle it accordingly
-    quality_url = f"{original_url}?quality={quality}"  # Modify based on how the source works
-    
-    await callback_query.message.reply("Downloading your video...")
-    filename = await download_file(quality_url)
-
-    if filename:
-        await callback_query.message.reply_document(document=filename)
-        os.remove(filename)  # Clean up the downloaded file
-    else:
-        await callback_query.message.reply("Failed to download the selected quality.")
-
-if __name__ == "__main__":
-    app.run()
+if __name__ == '__main__':
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
