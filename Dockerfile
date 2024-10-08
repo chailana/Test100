@@ -1,21 +1,23 @@
-# Base image
-FROM python:3.9-slim
+# Use an official Python runtime as a parent image
+FROM python:3.12-slim
 
-# Set the working directory
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy requirements.txt and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application files
+# Copy the current directory contents into the container at /app
 COPY . .
 
-# Make start.sh executable
-RUN chmod +x start.sh
+# Install FFmpeg
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Expose the port Flask will run on
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Make port 8080 available to the world outside this container
 EXPOSE 8080
 
-# Run the start.sh script to start the processes
-CMD ["./start.sh"]
+# Run the bot using gunicorn
+CMD ["gunicorn", "bot:app", "--bind", "0.0.0.0:8080"]
